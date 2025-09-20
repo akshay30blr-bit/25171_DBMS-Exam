@@ -1,0 +1,46 @@
+# app.py
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+# Replace with your actual PostgreSQL connection string
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:password@host:port/pms_db'
+db = SQLAlchemy(app)
+
+# Define your models (omitted for brevity, would mirror the SQL tables)
+
+# --- CRUD Operations for Goals ---
+
+# CREATE a new goal
+@app.route('/goals', methods=['POST'])
+def create_goal():
+    data = request.json
+    # Logic to create a new goal in the database
+    # ...
+    return jsonify({'message': 'Goal created'}), 201
+
+# READ all goals for an employee
+@app.route('/employees/<int:employee_id>/goals', methods=['GET'])
+def get_employee_goals(employee_id):
+    # Logic to query goals for the employee
+    # ...
+    return jsonify(goals_list)
+
+# UPDATE a goal's status (for managers only)
+@app.route('/goals/<int:goal_id>/status', methods=['PUT'])
+def update_goal_status(goal_id):
+    data = request.json
+    # Add authentication/authorization to ensure only a manager can do this
+    # Logic to find the goal and update its status
+    # ...
+    return jsonify({'message': 'Goal status updated'})
+
+# DELETE a goal (optional, often better to set status to 'Cancelled')
+@app.route('/goals/<int:goal_id>', methods=['DELETE'])
+def delete_goal(goal_id):
+    # Logic to delete a goal
+    # ...
+    return jsonify({'message': 'Goal deleted'})
+
+if __name__ == '__main__':
+    app.run(debug=True)

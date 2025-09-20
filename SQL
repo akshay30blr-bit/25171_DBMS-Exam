@@ -1,0 +1,64 @@
+-- Create custom ENUM types for status fields for data integrity
+CREATE TYPE goal_status AS ENUM ('Draft', 'In Progress', 'Completed', 'Cancelled');
+CREATE TYPE task_status AS ENUM ('Pending Approval', 'Approved', 'Completed');
+CREATE TYPE feedback_type AS ENUM ('Manager', 'System');
+
+-- Table for Employees and Managers
+CREATE TABLE employees (
+    employee_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    -- Role can be 'Manager' or 'Employee'
+    role VARCHAR(50) NOT NULL,
+    -- Self-referencing key to link an employee to their manager
+    manager_id INT REFERENCES employees(employee_id)
+);
+
+-- Table for Goals
+CREATE TABLE goals (
+    goal_id SERIAL PRIMARY KEY,
+    employee_id INT NOT NULL REFERENCES employees(employee_id),
+    description TEXT NOT NULL,
+    due_date DATE,
+    status goal_status DEFAULT 'Draft',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Table for Tasks linked to Goals
+CREATE TABLE tasks (
+    task_id SERIAL PRIMARY KEY,
+    goal_id INT NOT NULL REFERENCES goals(goal_id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    status task_status DEFAULT 'Pending Approval',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Table for Feedback linked to Goals
+CREATE TABLE feedback (
+    feedback_id SERIAL PRIMARY KEY,
+    goal_id INT NOT NULL REFERENCES goals(goal_id) ON DELETE CASCADE,
+    manager_id INT NOT NULL REFERENCES employees(employee_id),
+    comment TEXT NOT NULL,
+    type feedback_type DEFAULT 'Manager',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- 1. Create the Trigger Function
+CREATE OR REPLACE FUNCTION log_goal_completion_feedback()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the status is being updated TO 'Completed'
+    IF NEW.status = 'Completed' AND OLD.status != 'Completed' THEN
+        INSERT INTO feedback (goal_id, manager_id, comment, type)
+        VALUES (NEW.goal_id, (SELECT manager_id FROM employees WHERE employee_id = NEW.employee_id), 'Goal marked as completed. Great job!', 'System');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Create the Trigger
+CREATE TRIGGER goal_completed_trigger
+AFTER UPDATE ON goals
+FOR EACH ROW
+EXECUTE FUNCTION log_goal_completion_feedback();
+ALTER USER "PMS_Run" WITH PASSWORD 'a_new_secure_password';

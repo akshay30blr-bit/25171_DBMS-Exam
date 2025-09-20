@@ -1,0 +1,79 @@
+import dash
+from dash import dcc, html, dash_table
+import plotly.express as px
+import pandas as pd
+import psycopg2 # To connect to PostgreSQL
+
+# --- Database Connection ---
+# Connect to your PostgreSQL database and fetch data into a Pandas DataFrame
+# (Connection details hidden for security)
+conn = psycopg2.connect("dbname= user=PMS_Run password=6465 host=localhost")
+query = """
+SELECT
+    g.goal_id,
+    e.name as employee_name,
+    g.description,
+    g.due_date,
+    g.status,
+    f.comment as feedback_comment
+FROM goals g
+JOIN employees e ON g.employee_id = e.employee_id
+LEFT JOIN feedback f ON g.goal_id = f.goal_id;
+"""
+df = pd.read_sql_query(query, conn)
+conn.close()
+
+
+# --- Initialize the Dash App ---
+app = dash.Dash(__name__)
+
+# --- App Layout ---
+app.layout = html.Div(children=[
+    html.H1(children='Performance Management Dashboard'),
+
+    # Dropdown to filter by employee
+    dcc.Dropdown(
+        id='employee-filter',
+        options=[{'label': i, 'value': i} for i in df['employee_name'].unique()],
+        value=df['employee_name'].unique()[0] # Default value
+    ),
+
+    # Pie chart for goal status
+    dcc.Graph(id='status-pie-chart'),
+
+    # Data table for performance history
+    html.H3("Performance History"),
+    dash_table.DataTable(id='history-table', columns=[{"name": i, "id": i} for i in df.columns])
+])
+
+# --- Callbacks to make the dashboard interactive ---
+@app.callback(
+    [dash.dependencies.Output('status-pie-chart', 'figure'),
+     dash.dependencies.Output('history-table', 'data')],
+    [dash.dependencies.Input('employee-filter', 'value')]
+)
+def update_dashboard(selected_employee):
+    filtered_df = df[df.employee_name == selected_employee]
+
+    # Update pie chart
+    pie_fig = px.pie(
+        filtered_df,
+        names='status',
+        title=f'Goal Status for {selected_employee}'
+    )
+
+    # Update table data
+    table_data = filtered_df.to_dict('records')
+
+    return pie_fig, table_data
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
+    # In your Python file
+conn = psycopg2.connect(
+    host="localhost",
+    dbname="pms_db",
+    user="PMS_Run",
+    password="THIS_PASSWORD_MUST_BE_CORRECT"  # Double-check for typos here
+)
